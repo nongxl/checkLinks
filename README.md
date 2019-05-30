@@ -9,3 +9,4 @@ urls里是需要运维的地址。
 注释详细，没别的可说了。
 
 运行效果：
+https://github.com/nongxl/checkLinks/blob/master/QQ%E6%88%AA%E5%9B%BE20190530163023.png
