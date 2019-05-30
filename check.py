@@ -4,16 +4,9 @@ import requests
 from prettytable import PrettyTable
 import re
 urls = [
-    'http://221.7.197.251:7070/news_ann_new/',#新闻出版版权监管系统
-    'http://116.1.249.93:7070/xnqoa/',#兴宁区oa
-    'http://www.msxoa.cn/',#马山县oa
-    'http://180.141.91.29:8080/nnrd/',#人大综合管理信息平台
-    'http://116.252.213.74:7070/nmxoa/',#宁明县oa
-    'http://117.141.116.96:18080/qxqoa/',#青秀区oa
-    'http://117.141.117.48:17070/slxoa/',#上林县oa
-    'http://117.141.116.188:6092/wmqoa/',#武鸣县oa
-    'http://ccalm.free.idcfengye.com/qcbin',#QC外网
-    'http://192.168.23.241:8080/qcbin/',#QC内网
+    'www.google.com',
+    'www.163.com',
+    'www.qq.com'
     ]
 
 #通过正则匹配<title>标签的内容判断网页标题
