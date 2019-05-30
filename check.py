@@ -1,12 +1,12 @@
 from urllib.request import urlopen
 from urllib import request
-import requests
+import requests,re
 from prettytable import PrettyTable
-import re
 urls = [
-    'www.google.com',
-    'www.163.com',
-    'www.qq.com'
+    'https://mail.qq.com',
+    'https://www.12306.cn/',
+    'https://www.google.com',
+    'https://www.taobao.com'
     ]
 
 #通过正则匹配<title>标签的内容判断网页标题
