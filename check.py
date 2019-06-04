@@ -1,12 +1,15 @@
 from urllib.request import urlopen
 from urllib import request
-import requests,re
+import requests,re,chardet
 from prettytable import PrettyTable
+
 urls = [
     'https://mail.qq.com',
     'https://www.12306.cn/',
-    'https://www.google.com',
-    'https://www.taobao.com'
+    'https://www.ithome.com',
+    'https://www.taobao.com',
+    'https://www.adobe.com',
+    'https://www.csdn.net'
     ]
 
 #通过正则匹配<title>标签的内容判断网页标题
@@ -36,6 +39,8 @@ def get_title(html):
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
 headers = { 'User-Agent':user_agent }
 table = PrettyTable(['编号','系统名称','系统地址','网络状态','耗时(秒)','检查结果'])
+timelap = 0
+code = 0
 try:
     netCheck = urlopen('http://www.baidu.com').getcode()#访问百度测试网络连接
     print("\033[1;32;m 网络连接正常，开始检查... \033[0m")
@@ -47,8 +52,11 @@ try:
             code = resp.getcode()
             #获取响应时间
             timelap = requests.get(url).elapsed.total_seconds()
-            #获取网页内容并用于判断标题。部分网页编码不同会出错
-            html = str(resp.read(),'utf-8')
+            html = resp.read()
+            #获取网页编码方式
+            charset = chardet.detect(html)
+            #按网页的编码方式解码，否则会乱码报错
+            html = str(html,charset['encoding'])
             title = get_title(html)
             #将检查结果添加到表格中
             table.add_row([urls.index(url)+1,title,url,code,timelap,"\033[0;32;m 连接成功 \033[0m"])
@@ -56,7 +64,7 @@ try:
         except Exception as e:
             #将异常也添加到表格中
             err = str(e)
-            table.add_row([urls.index(url)+1,"null",url,err,"null","\033[0;31;m 连接错误 \033[0m"])
+            table.add_row([urls.index(url) + 1, "null", url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
 
 except Exception as e:
     #如果不能访问百度，通常就是网络错误
