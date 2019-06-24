@@ -9,12 +9,15 @@ urls = [
     'https://www.ithome.com',
     'https://www.taobao.com',
     'https://www.adobe.com',
-    'https://www.csdn.net'
+    'https://www.csdn.net',
+    'http://www.microsoft.com',
+    'https://github.com'
     ]
 
 #通过正则匹配<title>标签的内容判断网页标题
 def get_title(html):
     tar = '<title>.*?</title>'
+    tar = re.compile(tar, re.IGNORECASE)#不区分大小写，否则遇到大写的<TITLE></TITLE>标签匹配不出来
     target = re.findall(tar,html)
     if target:
         title = target[0]
