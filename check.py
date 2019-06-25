@@ -56,7 +56,7 @@ try:
             #获取响应时间
             timelap = requests.get(url).elapsed.total_seconds()
             html = resp.read()
-            #获取网页编码方式
+            #识别网页编码方式
             charset = chardet.detect(html)
             #按网页的编码方式解码，否则会乱码报错
             html = str(html,charset['encoding'])
@@ -70,7 +70,7 @@ try:
             table.add_row([urls.index(url) + 1, "null", url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
 
 except Exception as e:
-    #如果不能访问百度，通常就是网络错误
+    #如果不能访问百度，判断为网络错误
     print("\033[1;31;m 网络检查错误,不能访问外网。请先检查本机网络 \033[0m\n",e)
 
 print(table)
