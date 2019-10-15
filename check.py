@@ -2,6 +2,10 @@ from urllib.request import urlopen
 from urllib import request
 import requests,re,chardet
 from prettytable import PrettyTable
+import yagmail
+receivers = ['2724223624@qq.com','657047987@qq.com']
+#链接邮箱服务器
+yag = yagmail.SMTP( user="aaa@163.com", password="passw0rd111222", host='smtp.163.com')
 
 urls = [
     'https://mail.qq.com',
@@ -12,6 +16,7 @@ urls = [
     'https://www.csdn.net',
     'http://www.microsoft.com',
     'https://github.com'
+    'https://www.google.com'
     ]
 
 #通过正则匹配<title>标签的内容判断网页标题
@@ -44,6 +49,7 @@ headers = { 'User-Agent':user_agent }
 table = PrettyTable(['编号','系统名称','系统地址','网络状态','耗时(秒)','检查结果'])
 timelap = 0
 code = 0
+isSandMail = 0
 try:
     netCheck = urlopen('http://www.baidu.com').getcode()#访问百度测试网络连接
     print("\033[1;32;m 网络连接正常，开始检查... \033[0m")
@@ -68,9 +74,16 @@ try:
             #将异常也添加到表格中
             err = str(e)
             table.add_row([urls.index(url) + 1, "null", url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
+            isSandMail = 1
 
 except Exception as e:
     #如果不能访问百度，判断为网络错误
     print("\033[1;31;m 网络检查错误,不能访问外网。请先检查本机网络 \033[0m\n",e)
 
 print(table)
+if isSandMail == 1:
+    #发送邮件
+    try:
+        yag.send(receivers, '运维邮件：网站无法访问。请尽快处理', str(table))
+    except Exception as sendErr:
+        print('邮件发送失败'+str(sendErr))
