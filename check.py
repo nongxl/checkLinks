@@ -3,11 +3,11 @@ from urllib import request
 import requests,re,chardet
 from prettytable import PrettyTable
 import yagmail
-receivers = ['2724223624@qq.com','657047987@qq.com']
+receivers = ['111@qq.com','222@qq.com']
 #链接邮箱服务器
 yag = yagmail.SMTP( user="aaa@163.com", password="passw0rd111222", host='smtp.163.com')
 
-urls = [
+urls111 = [
     'https://mail.qq.com',
     'https://www.12306.cn/',
     'https://www.ithome.com',
@@ -18,6 +18,7 @@ urls = [
     'https://github.com'
     'https://www.google.com'
     ]
+
 
 #通过正则匹配<title>标签的内容判断网页标题
 def get_title(html):
