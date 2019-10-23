@@ -1,13 +1,15 @@
-from urllib.request import urlopen
+﻿from urllib.request import urlopen
 from urllib import request
 import requests,re,chardet
 from prettytable import PrettyTable
 import yagmail
-receivers = ['111@qq.com','222@qq.com']
+import datetime
+receivers = ['123@qq.com','456@qq.com']
 #链接邮箱服务器
-yag = yagmail.SMTP( user="aaa@163.com", password="passw0rd111222", host='smtp.163.com')
+yag = yagmail.SMTP( user="cks@163.com", password="passw0rd", host='smtp.163.com')
+logs = open('.\logs.log',encoding='utf-8',mode='a+')
 
-urls111 = [
+urls = [
     'https://mail.qq.com',
     'https://www.12306.cn/',
     'https://www.ithome.com',
@@ -18,7 +20,6 @@ urls111 = [
     'https://github.com'
     'https://www.google.com'
     ]
-
 
 #通过正则匹配<title>标签的内容判断网页标题
 def get_title(html):
@@ -53,7 +54,7 @@ code = 0
 isSandMail = 0
 try:
     netCheck = urlopen('http://www.baidu.com').getcode()#访问百度测试网络连接
-    print("\033[1;32;m 网络连接正常，开始检查... \033[0m")
+    print(str(datetime.datetime.now())+"\033[1;32;m 网络连接正常，开始检查... \033[0m")
     for url in urls:
         try:
             req = request.Request(url, None, headers)
@@ -79,12 +80,17 @@ try:
 
 except Exception as e:
     #如果不能访问百度，判断为网络错误
-    print("\033[1;31;m 网络检查错误,不能访问外网。请先检查本机网络 \033[0m\n",e)
+    print(str(datetime.datetime.now())+"\033[1;31;m 网络检查错误,不能访问外网。请先检查本机网络 \033[0m\n",e)
+    logs.write(str(datetime.datetime.now())+'\t'+'网络错误'+'\n')
 
 print(table)
+logs.write(str(datetime.datetime.now())+'\t'+'检查完成'+'\n')
 if isSandMail == 1:
     #发送邮件
     try:
-        yag.send(receivers, '运维邮件：网站无法访问。请尽快处理', str(table))
+        yag.send(receivers,'运维邮件：网站无法访问。请尽快处理',str(table))
+        logs.write(str(datetime.datetime.now())+'\t'+'运维邮件发送成功'+'\n')
     except Exception as sendErr:
         print('邮件发送失败'+str(sendErr))
+        logs.write(str(datetime.datetime.now())+'\t'+'邮件发送失败'+str(sendErr)+'\n'+str(table)+'\n')
+logs.close()
