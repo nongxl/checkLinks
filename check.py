@@ -17,8 +17,8 @@ urls = [
     'https://www.adobe.com',
     'https://www.csdn.net',
     'http://www.microsoft.com',
-    'https://github.com'
-    'https://www.google.com'
+    'https://github.com',
+    'http://192.168.23.241:8080/qcbin'
     ]
 
 #通过正则匹配<title>标签的内容判断网页标题
@@ -52,31 +52,42 @@ table = PrettyTable(['编号','系统名称','系统地址','网络状态','耗�
 timelap = 0
 code = 0
 isSandMail = 0
+
+def check(timelap,url):
+    try:
+        req = request.Request(url, None, headers)
+        resp = request.urlopen(req)
+        # 获取状态码
+        code = resp.getcode()
+        # 获取响应时间
+        timelap = requests.get(url).elapsed.total_seconds()
+        html = resp.read()
+        # 识别网页编码方式
+        charset = chardet.detect(html)
+        # 按网页的编码方式解码，否则会乱码报错
+        html = str(html, charset['encoding'])
+        title = get_title(html)
+        # 将检查结果添加到表格中
+        table.add_row([urls.index(url) + 1, title, url, code, timelap, "\033[0;32;m 连接成功 \033[0m"])
+    except Exception as e:
+        # 将异常也添加到表格中
+        err = str(e)
+        table.add_row([urls.index(url) + 1, "null", url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
+        return 'checkAgain'
+
 try:
     netCheck = urlopen('http://www.baidu.com').getcode()#访问百度测试网络连接
     print(str(datetime.datetime.now())+"\033[1;32;m 网络连接正常，开始检查... \033[0m")
     for url in urls:
-        try:
-            req = request.Request(url, None, headers)
-            resp = request.urlopen(req)
-            #获取状态码
-            code = resp.getcode()
-            #获取响应时间
-            timelap = requests.get(url).elapsed.total_seconds()
-            html = resp.read()
-            #识别网页编码方式
-            charset = chardet.detect(html)
-            #按网页的编码方式解码，否则会乱码报错
-            html = str(html,charset['encoding'])
-            title = get_title(html)
-            #将检查结果添加到表格中
-            table.add_row([urls.index(url)+1,title,url,code,timelap,"\033[0;32;m 连接成功 \033[0m"])
-
-        except Exception as e:
-            #将异常也添加到表格中
-            err = str(e)
-            table.add_row([urls.index(url) + 1, "null", url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
-            isSandMail = 1
+        if check(timelap,url) == 'checkAgain':
+            logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url+'\n')
+            if check(timelap, url) == 'checkAgain':
+                logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
+                if check(timelap, url) == 'checkAgain':
+                    logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
+                    isSandMail = 1
+                else:
+                    logs.write(str(datetime.datetime.now()) + '\t'+'不稳定'+ url + '\n')
 
 except Exception as e:
     #如果不能访问百度，判断为网络错误
@@ -89,7 +100,7 @@ if isSandMail == 1:
     #发送邮件
     try:
         yag.send(receivers,'运维邮件：网站无法访问。请尽快处理',str(table))
-        logs.write(str(datetime.datetime.now())+'\t'+'运维邮件发送成功'+'\n')
+        logs.write(str(datetime.datetime.now())+'\t'+'运维邮件发送成功'+'\n'+str(table)+'\n')
     except Exception as sendErr:
         print('邮件发送失败'+str(sendErr))
         logs.write(str(datetime.datetime.now())+'\t'+'邮件发送失败'+str(sendErr)+'\n'+str(table)+'\n')
