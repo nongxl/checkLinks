@@ -4,34 +4,6 @@ import requests,re,chardet
 from prettytable import PrettyTable
 import yagmail
 import datetime
-receivers = ['123@qq.com','456@qq.com']
-#链接邮箱服务器
-yag = yagmail.SMTP( user="cks@163.com", password="passw0rd", host='smtp.163.com')
-logs = open('.\logs.log',encoding='utf-8',mode='a+')
-
-urls = [
-    'https://mail.qq.com',
-    'https://www.12306.cn/',
-    'https://www.ithome.com',
-    'https://www.taobao.com',
-    'https://www.adobe.com',
-    'https://www.csdn.net',
-    'http://www.microsoft.com',
-    'https://github.com',
-    'http://192.168.23.241:8080/qcbin'
-    ]
-
-#通过正则匹配<title>标签的内容判断网页标题
-def get_title(html):
-    tar = '<title>.*?</title>'
-    tar = re.compile(tar, re.IGNORECASE)#不区分大小写，否则不同编码时<TITLE></TITLE>标签为大写匹配不出来
-    target = re.findall(tar,html)
-    if target:
-        title = target[0]
-        #对获取的title做进一步处理，取第七位之后和倒数第八位之前的内容作为网页标题
-        title = title[7:-8]
-        return title
-
 '''
 颜色显示的格式：
 \ 033 [显示方式;字体色;背景色m ...... [\ 033 [0m]
@@ -46,14 +18,20 @@ def get_title(html):
 		                      36 	      46 	     青蓝色
 		                      37 	      47 	      白色
 '''
+#链接邮箱服务器
+yag = yagmail.SMTP( user="1111111111@qq.com", password="22222222222", host='smtp.qq.com') #企业邮箱
+#logs = open('c:\\checkLinks\\logs.log',encoding='utf-8',mode='a+')
+logs = open('.\\logs.log',encoding='utf-8',mode='a+')
+config = open('.\\config.txt',encoding='utf-8')
+
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
 headers = { 'User-Agent':user_agent }
-table = PrettyTable(['编号','系统名称','系统地址','网络状态','耗时(秒)','检查结果'])
+table = PrettyTable(['系统名称','系统地址','网络状态','耗时(秒)','检查结果'])
 timelap = 0
 code = 0
 isSandMail = 0
 
-def check(timelap,url):
+def check(timelap,url,web_title):
     try:
         req = request.Request(url, None, headers)
         resp = request.urlopen(req)
@@ -68,24 +46,50 @@ def check(timelap,url):
         html = str(html, charset['encoding'])
         title = get_title(html)
         # 将检查结果添加到表格中
-        table.add_row([urls.index(url) + 1, title, url, code, timelap, "\033[0;32;m 连接成功 \033[0m"])
+        table.add_row([title, url, code, timelap, "\033[0;32;m 连接成功 \033[0m"])
     except Exception as e:
         # 将异常也添加到表格中
         err = str(e)
-        table.add_row([urls.index(url) + 1, "null", url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
+        table.add_row([web_title, url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
         return 'checkAgain'
+
+#通过正则匹配<title>标签的内容判断网页标题
+def get_title(html):
+    tar = '<title>.*?</title>'
+    tar = re.compile(tar, re.IGNORECASE)#不区分大小写，否则不同编码时<TITLE></TITLE>标签为大写匹配不出来
+    target = re.findall(tar,html)
+    if target:
+        title = target[0]
+        #对获取的title做进一步处理，取第七位之后和倒数第八位之前的内容作为网页标题
+        title = title[7:-8]
+        return title
+
+def sandMail(web_title,man,receiver):
+    try:
+        MSG = '运维邮件：%s 无法访问，请 %s 尽快处理' % (web_title,man)
+        yag.send(receiver,MSG,str(table))
+        logs.write(str(datetime.datetime.now()) + '\t' + '运维邮件发送成功,收信人' + str(man) + str(receiver) + '\n' + str(table) + '\n')
+    except Exception as sendErr:
+        print('邮件发送失败' + str(sendErr))
+        logs.write(str(datetime.datetime.now()) + '\t' + '邮件发送失败' + str(sendErr) + '\n' + str(table) + '\n')
 
 try:
     netCheck = urlopen('http://www.baidu.com').getcode()#访问百度测试网络连接
     print(str(datetime.datetime.now())+"\033[1;32;m 网络连接正常，开始检查... \033[0m")
-    for url in urls:
-        if check(timelap,url) == 'checkAgain':
+    for each_line in config.readlines():
+        web_title = str(each_line).split(';')[0]
+        url = str(each_line).split(';')[1]
+        mans = str(each_line).split(';')[2]
+        man = mans.split(',')
+        mailAddrs = str(each_line).split(';')[3]
+        receiver = mailAddrs.split(',')
+        if check(timelap,url,web_title) == 'checkAgain':
             logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url+'\n')
-            if check(timelap, url) == 'checkAgain':
+            if check(timelap, url,web_title) == 'checkAgain':
                 logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
-                if check(timelap, url) == 'checkAgain':
+                if check(timelap, url,web_title) == 'checkAgain':
                     logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
-                    isSandMail = 1
+                    sandMail(web_title,man,receiver)
                 else:
                     logs.write(str(datetime.datetime.now()) + '\t'+'不稳定'+ url + '\n')
 
@@ -95,13 +99,6 @@ except Exception as e:
     logs.write(str(datetime.datetime.now())+'\t'+'网络错误'+'\n')
 
 print(table)
-logs.write(str(datetime.datetime.now())+'\t'+'检查完成'+'\n')
-if isSandMail == 1:
-    #发送邮件
-    try:
-        yag.send(receivers,'运维邮件：网站无法访问。请尽快处理',str(table))
-        logs.write(str(datetime.datetime.now())+'\t'+'运维邮件发送成功'+'\n'+str(table)+'\n')
-    except Exception as sendErr:
-        print('邮件发送失败'+str(sendErr))
-        logs.write(str(datetime.datetime.now())+'\t'+'邮件发送失败'+str(sendErr)+'\n'+str(table)+'\n')
+#logs.write(str(datetime.datetime.now())+'\t'+'检查完成'+'\n')
 logs.close()
+config.close()
