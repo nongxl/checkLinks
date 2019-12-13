@@ -34,11 +34,11 @@ isSandMail = 0
 def check(timelap,url,web_title):
     try:
         req = request.Request(url, None, headers)
-        resp = request.urlopen(req)
+        resp = request.urlopen(req,timeout=10)
         # 获取状态码
         code = resp.getcode()
         # 获取响应时间
-        timelap = requests.get(url).elapsed.total_seconds()
+        timelap = requests.get(urltimeout=10).elapsed.total_seconds()
         html = resp.read()
         # 识别网页编码方式
         charset = chardet.detect(html)
