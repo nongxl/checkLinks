@@ -4,6 +4,9 @@ import requests,re,chardet
 from prettytable import PrettyTable
 import yagmail
 import datetime
+import time
+import ssl
+import urllib3
 '''
 颜色显示的格式：
 \ 033 [显示方式;字体色;背景色m ...... [\ 033 [0m]
@@ -19,10 +22,11 @@ import datetime
 		                      37 	      47 	      白色
 '''
 #链接邮箱服务器
-yag = yagmail.SMTP( user="1111111111@qq.com", password="22222222222", host='smtp.qq.com') #企业邮箱
+yag = yagmail.SMTP( user="123456789@qq.com", password="aykzrsxelgzedfbh", host='smtp.qq.com') #注意是否会被当成垃圾邮件
+
 #logs = open('c:\\checkLinks\\logs.log',encoding='utf-8',mode='a+')
-logs = open('.\\logs.log',encoding='utf-8',mode='a+')
-config = open('.\\config.txt',encoding='utf-8')
+logs = open('logs.log',encoding='utf-8',mode='a+')
+config = open('config.txt',encoding='utf-8')
 
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
 headers = { 'User-Agent':user_agent }
@@ -30,15 +34,19 @@ table = PrettyTable(['系统名称','系统地址','网络状态','耗时(秒)',
 timelap = 0
 code = 0
 isSandMail = 0
-
+context=ssl.SSLContext()
+urllib3.disable_warnings() #忽略证书错误
 def check(timelap,url,web_title):
     try:
         req = request.Request(url, None, headers)
-        resp = request.urlopen(req,timeout=10)
+        if url[0:5] == 'https': #处理https请求
+            resp = request.urlopen(req,context=context, timeout=10)
+        else: #非https请求
+            resp = request.urlopen(req,timeout=10)
         # 获取状态码
         code = resp.getcode()
         # 获取响应时间
-        timelap = requests.get(urltimeout=10).elapsed.total_seconds()
+        timelap = requests.get(url,verify=False,timeout=10).elapsed.total_seconds()
         html = resp.read()
         # 识别网页编码方式
         charset = chardet.detect(html)
@@ -66,7 +74,8 @@ def get_title(html):
 
 def sandMail(web_title,man,receiver):
     try:
-        MSG = '运维邮件：%s 无法访问，请 %s 尽快处理' % (web_title,man)
+        #MSG = '运维邮件：%s 无法访问，请 %s 尽快处理' % (web_title,man)
+        MSG = '%s 无法访问，请 %s 尽快处理' % (web_title,man)
         yag.send(receiver,MSG,str(table))
         logs.write(str(datetime.datetime.now()) + '\t' + '运维邮件发送成功,收信人' + str(man) + str(receiver) + '\n' + str(table) + '\n')
     except Exception as sendErr:
@@ -74,7 +83,8 @@ def sandMail(web_title,man,receiver):
         logs.write(str(datetime.datetime.now()) + '\t' + '邮件发送失败' + str(sendErr) + '\n' + str(table) + '\n')
 
 try:
-    netCheck = urlopen('http://www.baidu.com').getcode()#访问百度测试网络连接
+    netCheck = urlopen('https://www.baidu.com').getcode()#访问百度测试网络连接
+    print(netCheck)
     print(str(datetime.datetime.now())+"\033[1;32;m 网络连接正常，开始检查... \033[0m")
     for each_line in config.readlines():
         web_title = str(each_line).split(';')[0]
@@ -84,9 +94,11 @@ try:
         mailAddrs = str(each_line).split(';')[3]
         receiver = mailAddrs.split(',')
         if check(timelap,url,web_title) == 'checkAgain':
-            logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url+'\n')
+            logs.write(str(datetime.datetime.now()) + '\t' + '10秒后重新检查' + url+'\n')
+            time.sleep(10)
             if check(timelap, url,web_title) == 'checkAgain':
-                logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
+                logs.write(str(datetime.datetime.now()) + '\t' + '10秒后重新检查' + url + '\n')
+                time.sleep(10)
                 if check(timelap, url,web_title) == 'checkAgain':
                     logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
                     sandMail(web_title,man,receiver)
@@ -98,7 +110,6 @@ except Exception as e:
     print(str(datetime.datetime.now())+"\033[1;31;m 网络检查错误,不能访问外网。请先检查本机网络 \033[0m\n",e)
     logs.write(str(datetime.datetime.now())+'\t'+'网络错误'+'\n')
 
-print(table)
 #logs.write(str(datetime.datetime.now())+'\t'+'检查完成'+'\n')
 logs.close()
 config.close()
