@@ -82,6 +82,18 @@ def sandMail(web_title,man,receiver):
         print('邮件发送失败' + str(sendErr))
         logs.write(str(datetime.datetime.now()) + '\t' + '邮件发送失败' + str(sendErr) + '\n' + str(table) + '\n')
 
+webhook = 'https://qyapi.weixin.com/xxxxxxxxxx'
+def sendQyWeixin(web_title,man,webhook):
+    MSG = '%s 无法访问，请 %s 尽快处理' % (web_title, man)
+    data = {
+        "msgtype":"text",
+        "text":{
+            "content":MSG,
+        }
+    }
+    req = requests.post(url=webhook,headers=headers,json=data)
+    print(req)
+
 try:
     netCheck = urlopen('https://www.baidu.com').getcode()#访问百度测试网络连接
     print(netCheck)
@@ -93,17 +105,17 @@ try:
         man = mans.split(',')
         mailAddrs = str(each_line).split(';')[3]
         receiver = mailAddrs.split(',')
-        if check(timelap,url,web_title) == 'checkAgain':
-            logs.write(str(datetime.datetime.now()) + '\t' + '10秒后重新检查' + url+'\n')
-            time.sleep(10)
+        for retry in range(3):
             if check(timelap, url,web_title) == 'checkAgain':
-                logs.write(str(datetime.datetime.now()) + '\t' + '10秒后重新检查' + url + '\n')
+                logs.write(str(datetime.datetime.now()) + '\t' + f'{10 * (retry + 1)}秒后重新检查' + url+'\n')
                 time.sleep(10)
-                if check(timelap, url,web_title) == 'checkAgain':
-                    logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
-                    sandMail(web_title,man,receiver)
-                else:
+            else:
+                if retry > 0:
                     logs.write(str(datetime.datetime.now()) + '\t'+'不稳定'+ url + '\n')
+                break # 检查成功则跳出循环
+        else: # for 循环正常结束，即重试3次都失败
+            logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
+            sandMail(web_title,man,receiver)
 
 except Exception as e:
     #如果不能访问百度，判断为网络错误
