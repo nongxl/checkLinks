@@ -24,3 +24,8 @@
 
 运行效果：
 ![your-picture](imgs/运行效果.png?raw=true)
+
+# checkKeywords
+checkKeywords.py用于检测页面是否匹配某关键字。应用场景：系统每日更新，检查版本
+修改tar和tar2的正则表达式作为匹配关键词
+支持多线程
