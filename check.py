@@ -90,7 +90,8 @@ def sendQyWeixin(web_title,man,webhook):
 
 def process_url_in_thread(config_line, table_lock):
     """每个线程处理一个URL的检查、重试和通知逻辑"""
-    parts = config_line.strip().split(';')
+    # 先移除首尾的空白，再移除末尾可能存在的分号，最后才进行分割
+    parts = config_line.strip().rstrip(';').split(';')
     if len(parts) < 4:
         return # 跳过格式不正确的行
     web_title, url, mans, mailAddrs = parts

@@ -31,6 +31,7 @@ def check_website_status():
     code = 0
     isSandMail = 0
     threads = []  # 创建线程列表
+    print_lock = threading.Lock() # 为多线程打印操作创建一个锁
 
     def get_build_time(html):
         tar = '"BUILD_TIME": "(.*?)( - .*)"'#定义要检测的关键字
@@ -51,30 +52,32 @@ def check_website_status():
             code = resp.status_code
             build_time = get_build_time(html)
             if build_time !=[]:
-                print(web_title+"\033[0;32;m =="+str(build_time)+"== \033[0m")
+                # 使用锁确保多线程打印时输出不会混乱，并用f-string优化代码
+                with print_lock:
+                    print(f"{web_title}\033[0;32;m =={build_time}== \033[0m")
             else:
-                print(web_title+str(code)+"\033[1;31;m ==存在反爬虫措施需要手工测试==\033[0m"+"\033[0;34;m "+str(url)+"\033[0m")
+                with print_lock:
+                    print(f"{web_title}{code}\033[1;31;m ==存在反爬虫措施需要手工测试==\033[0m\033[0;34;m {url}\033[0m")
         except Exception as e:
             err = str(e)
-            print(web_title+"\033[1;31;m ==存在反爬虫措施需要手工测试==\033[0m"+"\033[0;34;m "+str(url)+"\033[0m")
+            with print_lock:
+                print(f"{web_title}\033[1;31;m ==存在反爬虫措施需要手工测试==\033[0m\033[0;34;m {url}\033[0m")
 
     for each_line in config.readlines():
-        parts = str(each_line).strip().split(';')
-        if len(parts) >= 4:
-            web_title = parts[0]
-            url = parts[1]
-            mans = parts[2]
-            man = mans.split(',')
-            mailAddrs = parts[3]
-            receiver = mailAddrs.split(',')
-            #check(web_title,url)
-            # 创建线程，目标函数为 check, 参数为 web_title 和 url
-            thread = threading.Thread(target=check, args=(web_title, url))
-            threads.append(thread)  # 添加到线程列表
-            thread.start()  # 启动线程
-        else:
+        # 清理并分割行数据，rstrip(';') 确保能处理行末尾有分号的情况
+        parts = each_line.strip().rstrip(';').split(';')
+        if len(parts) != 4:
             logs.write(str(datetime.datetime.now()) + '\t' + f'配置文件行格式错误，跳过: {each_line.strip()}\n')
             print(f"警告: 配置文件行格式错误，跳过: {each_line.strip()}")
+            continue
+
+        # 使用您喜欢的序列解包方式进行赋值
+        web_title, url, mans, mailAddrs = parts
+
+        # 创建并启动线程
+        thread = threading.Thread(target=check, args=(web_title, url))
+        threads.append(thread)
+        thread.start()
 
     for thread in threads: # 等待所有线程完成
         thread.join()
