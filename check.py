@@ -7,6 +7,7 @@ import datetime
 import time
 import ssl
 import urllib3
+import threading
 '''
 颜色显示的格式：
 \ 033 [显示方式;字体色;背景色m ...... [\ 033 [0m]
@@ -30,36 +31,29 @@ config = open('config.txt',encoding='utf-8')
 
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
 headers = { 'User-Agent':user_agent }
-table = PrettyTable(['系统名称','系统地址','网络状态','耗时(秒)','检查结果'])
-timelap = 0
-code = 0
-isSandMail = 0
+table = PrettyTable(['系统名称','系统地址','网络状态','耗时(秒)','检查结果']) # 全局表格对象
 context=ssl.SSLContext()
 urllib3.disable_warnings() #忽略证书错误
-def check(timelap,url,web_title):
+
+def check(url, web_title):
     try:
+        start_time = time.time()
         req = request.Request(url, None, headers)
-        if url[0:5] == 'https': #处理https请求
+        if url.startswith('https'): #处理https请求
             resp = request.urlopen(req,context=context, timeout=10)
         else: #非https请求
             resp = request.urlopen(req,timeout=10)
-        # 获取状态码
         code = resp.getcode()
-        # 获取响应时间
-        timelap = requests.get(url,verify=False,timeout=10).elapsed.total_seconds()
+        timelap = round(time.time() - start_time, 2)
         html = resp.read()
-        # 识别网页编码方式
         charset = chardet.detect(html)
-        # 按网页的编码方式解码，否则会乱码报错
-        html = str(html, charset['encoding'])
-        title = get_title(html)
-        # 将检查结果添加到表格中
-        table.add_row([title, url, code, timelap, "\033[0;32;m 连接成功 \033[0m"])
+        encoding = charset['encoding'] if charset['encoding'] else 'utf-8'
+        html_str = str(html, encoding, errors='ignore')
+        title = get_title(html_str) or web_title # 如果网页没有标题，则使用配置文件中的标题
+        return 'success', [title, url, code, timelap, "\033[0;32;m 连接成功 \033[0m"]
     except Exception as e:
-        # 将异常也添加到表格中
         err = str(e)
-        table.add_row([web_title, url, err, timelap, "\033[0;31;m 连接错误 \033[0m"])
-        return 'checkAgain'
+        return 'failure', [web_title, url, err, 'N/A', "\033[0;31;m 连接错误 \033[0m"]
 
 #通过正则匹配<title>标签的内容判断网页标题
 def get_title(html):
@@ -70,7 +64,7 @@ def get_title(html):
         title = target[0]
         #对获取的title做进一步处理，取第七位之后和倒数第八位之前的内容作为网页标题
         title = title[7:-8]
-        return title
+        return title.strip()
 
 def sandMail(web_title,man,receiver):
     try:
@@ -94,34 +88,58 @@ def sendQyWeixin(web_title,man,webhook):
     req = requests.post(url=webhook,headers=headers,json=data)
     print(req)
 
-try:
-    netCheck = urlopen('https://www.baidu.com').getcode()#访问百度测试网络连接
-    print(netCheck)
-    print(str(datetime.datetime.now())+"\033[1;32;m 网络连接正常，开始检查... \033[0m")
-    for each_line in config.readlines():
-        web_title = str(each_line).split(';')[0]
-        url = str(each_line).split(';')[1]
-        mans = str(each_line).split(';')[2]
-        man = mans.split(',')
-        mailAddrs = str(each_line).split(';')[3]
-        receiver = mailAddrs.split(',')
-        for retry in range(3):
-            if check(timelap, url,web_title) == 'checkAgain':
-                logs.write(str(datetime.datetime.now()) + '\t' + f'{10 * (retry + 1)}秒后重新检查' + url+'\n')
-                time.sleep(10)
-            else:
-                if retry > 0:
-                    logs.write(str(datetime.datetime.now()) + '\t'+'不稳定'+ url + '\n')
-                break # 检查成功则跳出循环
-        else: # for 循环正常结束，即重试3次都失败
-            logs.write(str(datetime.datetime.now()) + '\t' + '重新检查' + url + '\n')
-            sandMail(web_title,man,receiver)
+def process_url_in_thread(config_line, table_lock):
+    """每个线程处理一个URL的检查、重试和通知逻辑"""
+    parts = config_line.strip().split(';')
+    if len(parts) < 4:
+        return # 跳过格式不正确的行
+    web_title, url, mans, mailAddrs = parts
+    man = mans.split(',')
+    receiver = mailAddrs.split(',')
 
-except Exception as e:
-    #如果不能访问百度，判断为网络错误
-    print(str(datetime.datetime.now())+"\033[1;31;m 网络检查错误,不能访问外网。请先检查本机网络 \033[0m\n",e)
-    logs.write(str(datetime.datetime.now())+'\t'+'网络错误'+'\n')
+    for retry in range(3):
+        status, row_data = check(url, web_title)
+        if status == 'success':
+            if retry > 0:
+                logs.write(f"{datetime.datetime.now()}\t不稳定 {url}\n")
+            with table_lock:
+                table.add_row(row_data)
+            return # 检查成功，结束此函数
+        else: # 检查失败
+            logs.write(f"{datetime.datetime.now()}\t检查失败，{10 * (retry + 1)}秒后重试 {url}\n")
+            time.sleep(10)
 
-#logs.write(str(datetime.datetime.now())+'\t'+'检查完成'+'\n')
-logs.close()
-config.close()
+    # 循环结束，意味着3次重试都失败了
+    status, final_row_data = check(url, web_title) # 获取最后一次的失败信息
+    with table_lock:
+        table.add_row(final_row_data)
+    logs.write(f"{datetime.datetime.now()}\t重试3次后仍然失败 {url}\n")
+    sandMail(web_title, man, receiver)
+    # sendQyWeixin(web_title, man, webhook) # 如果需要，也可以在这里发送企业微信通知
+
+if __name__ == '__main__':
+    try:
+        urlopen('https://www.baidu.com', timeout=5).getcode() # 访问百度测试网络连接
+        print(f"{datetime.datetime.now()} \033[1;32;m网络连接正常，开始并发检查...\033[0m")
+
+        threads = []
+        table_lock = threading.Lock()
+        config_lines = config.readlines()
+        config.close()
+
+        for line in config_lines:
+            thread = threading.Thread(target=process_url_in_thread, args=(line, table_lock))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join() # 等待所有线程完成
+
+        print(table) # 所有检查完成后，打印最终的表格
+
+    except Exception as e:
+        print(f"{datetime.datetime.now()} \033[1;31;m网络检查错误,无法访问外网。请先检查本机网络\033[0m\n{e}")
+        logs.write(f"{datetime.datetime.now()}\t网络错误: {e}\n")
+    finally:
+        logs.write(f"{datetime.datetime.now()}\t检查完成\n")
+        logs.close()
